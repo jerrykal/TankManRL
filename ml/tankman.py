@@ -1,10 +1,13 @@
 import sys
 from os import path
 
+from pettingzoo.utils.env import AgentID
+
 sys.path.append((path.dirname(path.dirname(path.abspath(__file__)))))
 
 import functools
 from copy import deepcopy
+from typing import Any, Optional
 
 import gymnasium as gym
 import numpy as np
@@ -72,8 +75,13 @@ class parallel_env(ParallelEnv):
     }
 
     def __init__(
-        self, green_team_num, blue_team_num, frame_limit, sound="off", render_mode=None
-    ):
+        self,
+        green_team_num: int,
+        blue_team_num: int,
+        frame_limit: int,
+        sound: str = "off",
+        render_mode: Optional[str] = None,
+    ) -> None:
         # player_0 is green, player_1 is blue
         self.agents = ["player_0", "player_1"]
         self.possible_agents = self.agents[:]
@@ -88,7 +96,9 @@ class parallel_env(ParallelEnv):
 
         # Define action space
         action_space = Discrete(len(ACTIONS))
-        self.action_spaces = {agent: action_space for agent in self.possible_agents}
+        self.action_spaces: dict[AgentID, gym.spaces.Space] = {
+            agent: action_space for agent in self.possible_agents
+        }
 
         # Define observation space
         last_action_obs = Box(low=0, high=np.array([len(ACTIONS)], dtype=np.float32))
@@ -133,7 +143,7 @@ class parallel_env(ParallelEnv):
                 )
             )
         )
-        self.observation_spaces = {
+        self.observation_spaces: dict[AgentID, gym.spaces.Space] = {
             agent: observation_space for agent in self.possible_agents
         }
 
@@ -141,7 +151,7 @@ class parallel_env(ParallelEnv):
             user_num=green_team_num + blue_team_num,
             green_team_num=green_team_num,
             blue_team_num=blue_team_num,
-            is_manual=False,
+            is_manual="1",
             frame_limit=frame_limit,
             sound=sound,
         )
@@ -152,14 +162,14 @@ class parallel_env(ParallelEnv):
         self._game_view = None
 
     @functools.lru_cache(maxsize=None)
-    def observation_space(self, agent):
+    def observation_space(self, agent: AgentID) -> gym.spaces.Space:
         return self.observation_spaces[agent]
 
     @functools.lru_cache(maxsize=None)
-    def action_space(self, agent):
+    def action_space(self, agent: AgentID) -> gym.spaces.Space:
         return self.action_spaces[agent]
 
-    def render(self):
+    def render(self) -> None:
         if self.render_mode is None:
             gym.logger.warn(
                 "You are calling render method without specifying any render mode."
@@ -182,12 +192,14 @@ class parallel_env(ParallelEnv):
             game_progress_data = self.game.get_scene_progress_data()
             self._game_view.draw(game_progress_data)
 
-    def close(self):
+    def close(self) -> None:
         if self._game_view is not None:
             pygame.quit()
             self._game_view = None
 
-    def reset(self, seed=None, options=None):
+    def reset(
+        self, seed: Optional[int] = None, options: Optional[dict] = None
+    ) -> tuple[dict[AgentID, np.ndarray], dict[AgentID, dict[str, Any]]]:
         self.agents = self.possible_agents[:]
 
         self.game.reset()
@@ -207,7 +219,15 @@ class parallel_env(ParallelEnv):
 
         return observations, infos
 
-    def step(self, actions):
+    def step(
+        self, actions: dict[AgentID, int]
+    ) -> tuple[
+        dict[AgentID, np.ndarray],
+        dict[AgentID, float],
+        dict[AgentID, bool],
+        dict[AgentID, bool],
+        dict[AgentID, dict[str, Any]],
+    ]:
         player = 0
         commands = {}
         for agent, action_id in actions.items():
@@ -242,7 +262,7 @@ class parallel_env(ParallelEnv):
 
         return observations, rewards, terminations, truncations, infos
 
-    def _observation(self, agent):
+    def _observation(self, agent: AgentID) -> np.ndarray:
         agent_info = self._agent_infos[agent]
         prev_agent_info = self._prev_agent_infos[agent]
 
@@ -348,7 +368,7 @@ class parallel_env(ParallelEnv):
                 dx, dy = speed, speed
             elif angle == 90 or angle == -270:
                 dx, dy = 0, speed
-            elif angle == 45 or angle == -315:
+            else:
                 dx, dy = -speed, speed
 
             observation.extend(
@@ -365,8 +385,8 @@ class parallel_env(ParallelEnv):
 
         return np.array(observation, dtype=np.float32)
 
-    def _reward(self, agent):
-        reward = 0
+    def _reward(self, agent: AgentID) -> float:
+        reward = 0.0
 
         agent_info = self._agent_infos[agent]
         prev_agent_info = self._prev_agent_infos[agent]
