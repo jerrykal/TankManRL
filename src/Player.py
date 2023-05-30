@@ -1,5 +1,5 @@
 from os import path
-
+import random
 import pygame.draw
 from mlgame.utils.enum import get_ai_name
 from mlgame.view.view_model import create_asset_init_data, create_image_view_data, create_rect_view_data
@@ -26,6 +26,8 @@ class Player(pygame.sprite.Sprite):
         self.origin_xy = self.rect.topleft
         self.origin_center = self.rect.center
         self.origin_size = (self.rect.width, self.rect.height)
+        self.original_rect = self.rect.copy()
+        self.draw_pos = self.rect.topleft
         self.surface = pygame.Surface(self.origin_size)
         self.angle = 0
         self.score = 0
@@ -52,6 +54,7 @@ class Player(pygame.sprite.Sprite):
         self.is_backward = False
         self.is_turn_right = False
         self.is_turn_left = False
+        self.action_history = []
         self.act_cd = kwargs["act_cd"]
         if self.rect.x >= self.play_rect_area.width // 2 and self.rect.y < (self.play_rect_area.height - 100) // 2:
             self.quadrant = 1
@@ -91,9 +94,12 @@ class Player(pygame.sprite.Sprite):
     def rotate(self):
         self.rot = self.rot % 360
         self.angle = 3.14 / 180 * self.rot
-        origin_center = self.rect.center
         new_sur = pygame.transform.rotate(self.surface, self.rot)
+        origin_center = self.rect.center
         self.rect = new_sur.get_rect()
+        self.rect.center = origin_center
+        self.draw_pos = self.rect.topleft
+        self.rect = self.original_rect.copy()
         self.rect.center = origin_center
 
     def act(self, commands: list):
@@ -104,22 +110,40 @@ class Player(pygame.sprite.Sprite):
         if self.oil <= 0:
             self.oil = 0
             return
-        if LEFT_CMD in commands:
+        if LEFT_CMD in commands and not self.is_turn_left and RIGHT_CMD not in commands:
             self.oil -= 0.1
             self.turn_left()
-        elif RIGHT_CMD in commands:
+            self.is_turn_left = True
+            self.is_forward = False
+            self.is_backward = False
+            self.is_turn_right = False
+            self.action_history.append('left')
+        elif RIGHT_CMD in commands and not self.is_turn_right and LEFT_CMD not in commands:
             self.oil -= 0.1
             self.turn_right()
+            self.is_turn_right = True
+            self.is_forward = False
+            self.is_backward = False
+            self.is_turn_left = False
+            self.action_history.append('right')
         elif FORWARD_CMD in commands and BACKWARD_CMD not in commands:
             self.oil -= 0.1
             self.forward()
             self.is_forward = True
             self.is_backward = False
+            self.is_turn_right = False
+            self.is_turn_left = False
+            self.action_history.append('forward')
         elif BACKWARD_CMD in commands and FORWARD_CMD not in commands:
             self.oil -= 0.1
             self.backward()
             self.is_backward = True
             self.is_forward = False
+            self.is_turn_right = False
+            self.is_turn_left = False
+            self.action_history.append('backward')
+
+        self.action_history = self.action_history[-2:]
 
     def shoot(self):
         if self.act_cd and self.used_frame - self.last_shoot_frame > SHOOT_COOLDOWN:
@@ -130,7 +154,7 @@ class Player(pygame.sprite.Sprite):
             self.power -= 1
             self.is_shoot = True
 
-    def forward(self):
+    def forward(self, is_collide=False):
         if self.id != 1:
             rot = self.rot + 180
             if rot >= 360:
@@ -154,7 +178,7 @@ class Player(pygame.sprite.Sprite):
         elif rot == 45:
             self.rect.center += self.move["left_down"]
 
-    def backward(self):
+    def backward(self, is_collide=False):
         if self.id != 1:
             rot = self.rot + 180
             if rot >= 360:
@@ -179,26 +203,27 @@ class Player(pygame.sprite.Sprite):
             self.rect.center += self.move["right_up"]
 
     def turn_left(self):
-        if not self.is_turn_left:
-            self.last_turn_frame = self.used_frame
-            self.rot += self.rot_speed
-            self.is_turn_left = True
+        self.last_turn_frame = self.used_frame
+        self.rot += self.rot_speed
 
     def turn_right(self):
-        if not self.is_turn_right:
-            self.last_turn_frame = self.used_frame
-            self.rot -= self.rot_speed
-            self.is_turn_right = True
+        self.last_turn_frame = self.used_frame
+        self.rot -= self.rot_speed
 
     def collide_with_walls(self):
-        if self.is_turn_left:
-            self.turn_right()
-        elif self.is_turn_right:
-            self.turn_left()
-        if self.is_forward:
-            self.backward()
-        elif self.is_backward:
-            self.forward()
+        # Retrieve last two actions
+        last_actions = self.action_history[-2:]
+
+        # Reverse actions
+        for action in reversed(last_actions):
+            if action == 'forward':
+                self.backward()
+            elif action == 'backward':
+                self.forward()
+            elif action == 'left':
+                self.turn_right()
+            elif action == 'right':
+                self.turn_left()
 
     def collide_with_bullets(self):
         self.lives -= 1
@@ -243,7 +268,7 @@ class Player(pygame.sprite.Sprite):
     def get_obj_progress_data(self) -> dict:
         if not self.is_alive:
             return []
-        image_data = create_image_view_data(f"{self.id}P", *self.rect.topleft, *self.origin_size, self.angle)
+        image_data = create_image_view_data(f"{self.id}P", *self.draw_pos, *self.origin_size, self.angle)
         return image_data
 
     def get_obj_init_data(self) -> list:
@@ -257,7 +282,7 @@ class Player(pygame.sprite.Sprite):
 
     def get_info_to_game_result(self) -> dict:
         info = {"no": f"{self.no}P"
-                , "score": self.score
-                , "lives": self.lives
+            , "score": self.score
+            , "lives": self.lives
                 }
         return info

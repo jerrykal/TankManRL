@@ -26,9 +26,9 @@ class MLPlay:
         if scene_info["status"] != "GAME_ALIVE":
             # print(scene_info)
             return "RESET"
+        act = random.randrange(5)
         shoot_cd = random.randrange(15, 31)
         if scene_info["used_frame"] % shoot_cd == 0:
-            act = random.randrange(5)
             is_shoot = random.randrange(2)
         else:
             act = 0
@@ -46,6 +46,10 @@ class MLPlay:
 
         if is_shoot:
             command.append("SHOOT")
+
+        if self.side == "1P":
+            if pygame.K_b in keyboard:
+                command.append("DEBUG")
 
         if not command:
             command.append("NONE")

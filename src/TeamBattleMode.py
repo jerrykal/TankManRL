@@ -18,6 +18,8 @@ from .collide_hit_rect import *
 from .env import *
 from .game_module.fuctions import set_topleft, add_score, set_shoot
 
+is_test = False
+
 
 class TeamBattleMode:
     def __init__(self, green_team_num: int, blue_team_num: int, is_manual: bool, frame_limit: int, sound_path: str, play_rect_area: pygame.Rect):
@@ -26,7 +28,7 @@ class TeamBattleMode:
         self.sound_path = sound_path
         self.green_team_num = green_team_num
         self.blue_team_num = blue_team_num if (6 - (green_team_num + blue_team_num)) >= 0 else (6 - green_team_num)
-        self.map_name = f"map_{green_team_num}_v_{self.blue_team_num}.tmx"
+        self.map_name = f"map_{green_team_num}_v_{self.blue_team_num}.tmx" if not is_test else f"test_map_{green_team_num}_v_{self.blue_team_num}.tmx"
         self.map_path = path.join(MAP_DIR, self.map_name)
         self.map = TiledMap(self.map_path)
         self.scene_width = self.map.map_width
