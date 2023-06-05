@@ -1,10 +1,14 @@
 import pygame.sprite
 
+from src.Player import Player
+
 
 def collide_with_walls(group1: pygame.sprite.Group, group2: pygame.sprite.Group):
     hits = pygame.sprite.groupcollide(group1, group2, False, False, pygame.sprite.collide_rect_ratio(0.8))
     for sprite, walls in hits.items():
         sprite.collide_with_walls()
+        if isinstance(sprite, Player):
+            return
 
 
 def collide_with_bullets(group1: pygame.sprite.Group, group2: pygame.sprite.Group):

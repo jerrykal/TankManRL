@@ -76,7 +76,7 @@ class TestTankPlayer(object):
                 "right_down": (self.player.speed, self.player.speed),
                 "left": (-self.player.speed, 0), "right": (self.player.speed, 0), "up": (0, -self.player.speed),
                 "down": (0, self.player.speed)}
-        assert self.player.move == move
+        assert self.player.move_dict == move
 
     def test_act(self):
         # TODO 增加限制type

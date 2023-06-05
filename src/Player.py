@@ -8,6 +8,7 @@ from .env import LEFT_CMD, RIGHT_CMD, FORWARD_CMD, BACKWARD_CMD, SHOOT, SHOOT_CO
     IMAGE_DIR, ORANGE, BLUE
 
 Vec = pygame.math.Vector2
+is_debug = False
 
 
 class Player(pygame.sprite.Sprite):
@@ -39,7 +40,7 @@ class Player(pygame.sprite.Sprite):
 
         self.speed = 8
         # TODO refactor use vel
-        self.move = {"left_up": Vec(-self.speed, -self.speed), "right_up": Vec(self.speed, -self.speed),
+        self.move_dict = {"left_up": Vec(-self.speed, -self.speed), "right_up": Vec(self.speed, -self.speed),
                      "left_down": Vec(-self.speed, self.speed), "right_down": Vec(self.speed, self.speed),
                      "left": Vec(-self.speed, 0), "right": Vec(self.speed, 0), "up": Vec(0, -self.speed),
                      "down": Vec(0, self.speed)}
@@ -54,16 +55,22 @@ class Player(pygame.sprite.Sprite):
         self.is_backward = False
         self.is_turn_right = False
         self.is_turn_left = False
+        self.collided = False
         self.action_history = []
         self.act_cd = kwargs["act_cd"]
-        if self.rect.x >= self.play_rect_area.width // 2 and self.rect.y < (self.play_rect_area.height - 100) // 2:
-            self.quadrant = 1
-        elif self.rect.x < self.play_rect_area.width // 2 and self.rect.y < (self.play_rect_area.height - 100) // 2:
-            self.quadrant = 2
-        elif self.rect.x < self.play_rect_area.width // 2 and self.rect.y >= (self.play_rect_area.height - 100) // 2:
-            self.quadrant = 3
-        else:
-            self.quadrant = 4
+        self.quadrant = 0
+
+        self.calculate_quadrant()
+
+    def calculate_quadrant(self):
+        mid_x = self.play_rect_area.width // 2
+        mid_y = (self.play_rect_area.height - 100) // 2
+        self.quadrant = (
+            1 if self.rect.x >= mid_x and self.rect.y < mid_y else
+            2 if self.rect.x < mid_x and self.rect.y < mid_y else
+            3 if self.rect.x < mid_x and self.rect.y >= mid_y else
+            4
+        )
 
     def update(self, command: dict):
         self.used_frame += 1
@@ -103,14 +110,15 @@ class Player(pygame.sprite.Sprite):
         self.rect.center = origin_center
 
     def act(self, commands: list):
-        if not commands:
+        if not commands or self.collided:
             return None
-        if self.power and SHOOT in commands:
+        command = commands.pop()
+        if self.power and SHOOT == command:
             self.shoot()
         if self.oil <= 0:
             self.oil = 0
             return
-        if LEFT_CMD in commands and not self.is_turn_left and RIGHT_CMD not in commands:
+        if LEFT_CMD == command and not self.is_turn_left and RIGHT_CMD != command:
             self.oil -= 0.1
             self.turn_left()
             self.is_turn_left = True
@@ -118,7 +126,7 @@ class Player(pygame.sprite.Sprite):
             self.is_backward = False
             self.is_turn_right = False
             self.action_history.append('left')
-        elif RIGHT_CMD in commands and not self.is_turn_right and LEFT_CMD not in commands:
+        elif RIGHT_CMD == command and not self.is_turn_right and LEFT_CMD != command:
             self.oil -= 0.1
             self.turn_right()
             self.is_turn_right = True
@@ -126,7 +134,7 @@ class Player(pygame.sprite.Sprite):
             self.is_backward = False
             self.is_turn_left = False
             self.action_history.append('right')
-        elif FORWARD_CMD in commands and BACKWARD_CMD not in commands:
+        elif FORWARD_CMD == command and BACKWARD_CMD != command:
             self.oil -= 0.1
             self.forward()
             self.is_forward = True
@@ -134,7 +142,7 @@ class Player(pygame.sprite.Sprite):
             self.is_turn_right = False
             self.is_turn_left = False
             self.action_history.append('forward')
-        elif BACKWARD_CMD in commands and FORWARD_CMD not in commands:
+        elif BACKWARD_CMD == command and FORWARD_CMD != command:
             self.oil -= 0.1
             self.backward()
             self.is_backward = True
@@ -143,7 +151,7 @@ class Player(pygame.sprite.Sprite):
             self.is_turn_left = False
             self.action_history.append('backward')
 
-        self.action_history = self.action_history[-2:]
+        self.action_history = self.action_history[-1:]
 
     def shoot(self):
         if self.act_cd and self.used_frame - self.last_shoot_frame > SHOOT_COOLDOWN:
@@ -154,7 +162,7 @@ class Player(pygame.sprite.Sprite):
             self.power -= 1
             self.is_shoot = True
 
-    def forward(self, is_collide=False):
+    def forward(self):
         if self.id != 1:
             rot = self.rot + 180
             if rot >= 360:
@@ -162,23 +170,23 @@ class Player(pygame.sprite.Sprite):
         else:
             rot = self.rot
         if rot == 0:
-            self.rect.center += self.move["left"]
+            self.rect.center += self.move_dict["left"]
         elif rot == 315:
-            self.rect.center += self.move["left_up"]
+            self.rect.center += self.move_dict["left_up"]
         elif rot == 270:
-            self.rect.center += self.move["up"]
+            self.rect.center += self.move_dict["up"]
         elif rot == 225:
-            self.rect.center += self.move["right_up"]
+            self.rect.center += self.move_dict["right_up"]
         elif rot == 180:
-            self.rect.center += self.move["right"]
+            self.rect.center += self.move_dict["right"]
         elif rot == 135:
-            self.rect.center += self.move["right_down"]
+            self.rect.center += self.move_dict["right_down"]
         elif rot == 90:
-            self.rect.center += self.move["down"]
+            self.rect.center += self.move_dict["down"]
         elif rot == 45:
-            self.rect.center += self.move["left_down"]
+            self.rect.center += self.move_dict["left_down"]
 
-    def backward(self, is_collide=False):
+    def backward(self):
         if self.id != 1:
             rot = self.rot + 180
             if rot >= 360:
@@ -186,21 +194,21 @@ class Player(pygame.sprite.Sprite):
         else:
             rot = self.rot
         if rot == 0:
-            self.rect.center += self.move["right"]
+            self.rect.center += self.move_dict["right"]
         elif rot == 315:
-            self.rect.center += self.move["right_down"]
+            self.rect.center += self.move_dict["right_down"]
         elif rot == 270:
-            self.rect.center += self.move["down"]
+            self.rect.center += self.move_dict["down"]
         elif rot == 225:
-            self.rect.center += self.move["left_down"]
+            self.rect.center += self.move_dict["left_down"]
         elif rot == 180:
-            self.rect.center += self.move["left"]
+            self.rect.center += self.move_dict["left"]
         elif rot == 135:
-            self.rect.center += self.move["left_up"]
+            self.rect.center += self.move_dict["left_up"]
         elif rot == 90:
-            self.rect.center += self.move["up"]
+            self.rect.center += self.move_dict["up"]
         elif rot == 45:
-            self.rect.center += self.move["right_up"]
+            self.rect.center += self.move_dict["right_up"]
 
     def turn_left(self):
         self.last_turn_frame = self.used_frame
@@ -212,7 +220,7 @@ class Player(pygame.sprite.Sprite):
 
     def collide_with_walls(self):
         # Retrieve last two actions
-        last_actions = self.action_history[-2:]
+        last_actions = self.action_history[-1:]
 
         # Reverse actions
         for action in reversed(last_actions):
@@ -282,7 +290,15 @@ class Player(pygame.sprite.Sprite):
 
     def get_info_to_game_result(self) -> dict:
         info = {"no": f"{self.no}P"
-            , "score": self.score
-            , "lives": self.lives
+                , "score": self.score
+                , "lives": self.lives
                 }
+        if is_debug:
+            if self.rect.right > self.play_rect_area.right \
+                    or self.rect.left < self.play_rect_area.left \
+                    or self.rect.bottom > self.play_rect_area.bottom \
+                    or self.rect.top < self.play_rect_area.top:
+                print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!【OUT】!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            else:
+                print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!【SAFE】!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         return info
