@@ -44,7 +44,7 @@ if __name__ == "__main__":
             "green_team_num": opts.green_team_num,
             "blue_team_num": opts.blue_team_num,
             "frame_limit": opts.frame_limit,
-            "random": True,
+            "randomize": True,
             "render_mode": "human",
         },
     )

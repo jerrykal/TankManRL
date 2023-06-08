@@ -105,7 +105,7 @@ def train(opts: Namespace) -> None:
             "green_team_num": opts.green_team_num,
             "blue_team_num": opts.blue_team_num,
             "frame_limit": opts.frame_limit,
-            "random": True,
+            "randomize": True,
         },
     )
     eval_env = Monitor(eval_env)
