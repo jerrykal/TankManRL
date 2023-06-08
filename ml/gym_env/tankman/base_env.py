@@ -7,18 +7,19 @@ sys.path.append(
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Optional
+from typing import Optional, Union
 
 import gymnasium as gym
 import numpy as np
 import pygame
 from mlgame.view.view import PygameView
 
+from src.env import FPS
 from src.Game import Game
 
 
 class TankManBaseEnv(gym.Env, ABC):
-    metadata = {"render_modes": ["human"]}
+    metadata = {"render_modes": ["human"], "render_fps": FPS}
 
     def __init__(
         self,
@@ -44,7 +45,7 @@ class TankManBaseEnv(gym.Env, ABC):
         self.render_mode = render_mode
         self._game_view = None
 
-    def render(self, fps: int = 60) -> None:
+    def render(self) -> None:
         if self.render_mode is None:
             gym.logger.warn(
                 "You are calling render method without specifying any render mode."
@@ -63,7 +64,7 @@ class TankManBaseEnv(gym.Env, ABC):
                 scene_init_info_dict = self.game.get_scene_init_data()
                 self._game_view = PygameView(scene_init_info_dict)
 
-            pygame.time.Clock().tick(fps)
+            pygame.time.Clock().tick(self.metadata["render_fps"])
             game_progress_data = self.game.get_scene_progress_data()
             self._game_view.draw(game_progress_data)
 
@@ -89,9 +90,9 @@ class TankManBaseEnv(gym.Env, ABC):
         return obs, {}
 
     def step(
-        self, action_list: np.ndarray
+        self, action: Union[int, np.ndarray]
     ) -> tuple[np.ndarray, float, bool, bool, dict]:
-        commands = self._get_commands(action_list)
+        commands = self._get_commands(action)
         self.game.update(deepcopy(commands))
 
         scene_info = self.game.get_data_from_game_to_player()
@@ -127,5 +128,5 @@ class TankManBaseEnv(gym.Env, ABC):
         pass
 
     @abstractmethod
-    def _get_commands(self, action_list: np.ndarray) -> dict:
+    def _get_commands(self, action: Union[int, np.ndarray]) -> dict:
         pass
