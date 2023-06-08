@@ -36,7 +36,7 @@ class TankManBaseEnv(gym.Env, ABC):
             user_num=green_team_num + blue_team_num,
             green_team_num=green_team_num,
             blue_team_num=blue_team_num,
-            is_manual="0",
+            is_manual="",
             frame_limit=frame_limit,
             sound=sound,
         )
