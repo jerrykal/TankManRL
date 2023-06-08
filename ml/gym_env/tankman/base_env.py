@@ -7,7 +7,7 @@ sys.path.append(
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Optional, Union
+from typing import Optional
 
 import gymnasium as gym
 import numpy as np
@@ -41,6 +41,7 @@ class TankManBaseEnv(gym.Env, ABC):
             sound=sound,
         )
         self._prev_scene_info = {}
+        self._prev_action = None
 
         self.render_mode = render_mode
         self._game_view = None
@@ -84,14 +85,13 @@ class TankManBaseEnv(gym.Env, ABC):
 
         scene_info = self.game.get_data_from_game_to_player()
         self._prev_scene_info = scene_info
+        self._prev_action = None
 
         obs = self._get_obs(scene_info)
 
         return obs, {}
 
-    def step(
-        self, action: Union[int, np.ndarray]
-    ) -> tuple[np.ndarray, float, bool, bool, dict]:
+    def step(self, action: int) -> tuple[np.ndarray, float, bool, bool, dict]:
         commands = self._get_commands(action)
         self.game.update(deepcopy(commands))
 
@@ -102,6 +102,7 @@ class TankManBaseEnv(gym.Env, ABC):
         terminate = self._is_done(scene_info)
 
         self._prev_scene_info = scene_info
+        self._prev_action = action
 
         return obs, reward, terminate, False, {}
 
@@ -128,5 +129,5 @@ class TankManBaseEnv(gym.Env, ABC):
         pass
 
     @abstractmethod
-    def _get_commands(self, action: Union[int, np.ndarray]) -> dict:
+    def _get_commands(self, action: int) -> dict:
         pass
