@@ -17,7 +17,7 @@ class Bullet(pygame.sprite.Sprite):
         self.rect.center = construction["_init_pos"]
         self.rot = kwargs["rot"]
         self.play_rect_area = kwargs["play_rect_area"]
-        self.speed = 10
+        self.speed = kwargs["bullet_speed"]
         self.map_width = WINDOW_WIDTH
         self.map_height = WINDOW_HEIGHT
         self.angle = 3.14 / 180 * (self.rot + 90)
