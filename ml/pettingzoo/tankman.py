@@ -1,8 +1,6 @@
 import sys
 from os import path
 
-from pettingzoo.utils.env import AgentID
-
 sys.path.append((path.dirname(path.dirname(path.abspath(__file__)))))
 
 import functools
@@ -18,6 +16,7 @@ from mlgame.utils.enum import get_ai_name
 from mlgame.view.view import PygameView
 from pettingzoo import ParallelEnv
 from pettingzoo.utils import parallel_to_aec, wrappers
+from pettingzoo.utils.env import AgentID
 
 from src.env import BACKWARD_CMD, FORWARD_CMD, FPS, LEFT_CMD, RIGHT_CMD, SHOOT
 from src.Game import Game
@@ -25,12 +24,11 @@ from src.Game import Game
 WIDTH = 1000
 HEIGHT = 600
 BULLET_SPEED = 10
-MAX_TANK_NUM = 3
+MAX_TANK_NUM = 1
 OIL_STATION_NUM = 2
 BULLET_STATION_NUM = 2
 MAX_BULLET_NUM = 60
 MAX_WALL_NUM = 70
-
 
 COMMANDS = [
     ["NONE"],
@@ -38,11 +36,11 @@ COMMANDS = [
     [BACKWARD_CMD],
     [LEFT_CMD],
     [RIGHT_CMD],
-    [SHOOT],
-    [FORWARD_CMD, SHOOT],
-    [BACKWARD_CMD, SHOOT],
-    [LEFT_CMD, SHOOT],
-    [RIGHT_CMD, SHOOT],
+    # [SHOOT],
+    # [FORWARD_CMD, SHOOT],
+    # [BACKWARD_CMD, SHOOT],
+    # [LEFT_CMD, SHOOT],
+    # [RIGHT_CMD, SHOOT],
 ]
 
 ACTIONS = []
@@ -82,16 +80,15 @@ class parallel_env(ParallelEnv):
         sound: str = "off",
         render_mode: Optional[str] = None,
     ) -> None:
-        # player_0 is green, player_1 is blue
-        self.agents = ["player_0", "player_1"]
+        self.agents = ["green_team", "blue_team"]
         self.possible_agents = self.agents[:]
         self.agent_name_mapping = {
-            "player_0": 0,
-            "player_1": 1,
+            "green_team": 0,
+            "blue_team": 1,
         }
         self.team_num = {
-            "player_0": green_team_num,
-            "player_1": blue_team_num,
+            "green_team": green_team_num,
+            "blue_team": blue_team_num,
         }
 
         # Define action space
@@ -102,10 +99,15 @@ class parallel_env(ParallelEnv):
 
         # Define observation space
         last_action_obs = Box(low=0, high=np.array([len(ACTIONS)], dtype=np.float32))
+        # friendly_tank_obs = Box(
+        #     # x, y, dx, dy, angle, lives, power, oil
+        #     low=np.array([0, 0, -24, -24, 0, 0, 0, 0], dtype=np.float32),
+        #     high=np.array([WIDTH, HEIGHT, 24, 24, 360, 3, 10, 100], dtype=np.float32),
+        # )
         friendly_tank_obs = Box(
-            # x, y, dx, dy, angle, lives, power, oil
-            low=np.array([0, 0, -18, -18, 0, -360, 0, 0], dtype=np.float32),
-            high=np.array([WIDTH, HEIGHT, 18, 18, 360, 3, 10, 100], dtype=np.float32),
+            # x, y, dx, dy, angle, oil
+            low=np.array([0, 0, -8, -8, 0, 0], dtype=np.float32),
+            high=np.array([WIDTH, HEIGHT, 8, 8, 360, 100], dtype=np.float32),
         )
         enemy_tank_obs = friendly_tank_obs
         oil_station_obs = Box(
@@ -135,11 +137,11 @@ class parallel_env(ParallelEnv):
                 (
                     last_action_obs,
                     *[friendly_tank_obs] * MAX_TANK_NUM,
-                    *[enemy_tank_obs] * MAX_TANK_NUM,
+                    # *[enemy_tank_obs] * MAX_TANK_NUM,
                     *[oil_station_obs] * OIL_STATION_NUM,
-                    *[bullet_station_obs] * BULLET_STATION_NUM,
-                    *[wall_obs] * MAX_WALL_NUM,
-                    *[bullet_obs] * MAX_BULLET_NUM,
+                    # *[bullet_station_obs] * BULLET_STATION_NUM,
+                    # *[wall_obs] * MAX_WALL_NUM,
+                    # *[bullet_obs] * MAX_BULLET_NUM,
                 )
             )
         )
@@ -151,11 +153,11 @@ class parallel_env(ParallelEnv):
             user_num=green_team_num + blue_team_num,
             green_team_num=green_team_num,
             blue_team_num=blue_team_num,
-            is_manual="1",
+            is_manual="0",
             frame_limit=frame_limit,
             sound=sound,
         )
-        self._prev_agent_infos = {}
+        self._prev_scene_infos = {}
         self._prev_actions = {agent: 0 for agent in self.agents}
 
         self.render_mode = render_mode
@@ -188,7 +190,7 @@ class parallel_env(ParallelEnv):
                 scene_init_info_dict = self.game.get_scene_init_data()
                 self._game_view = PygameView(scene_init_info_dict)
 
-            pygame.time.Clock().tick(self.metadata["render_fps"])
+            # pygame.time.Clock().tick(self.metadata["render_fps"])
             game_progress_data = self.game.get_scene_progress_data()
             self._game_view.draw(game_progress_data)
 
@@ -207,11 +209,11 @@ class parallel_env(ParallelEnv):
             self._game_view.reset()
 
         scene_info = self.game.get_data_from_game_to_player()
-        self._agent_infos = {
-            "player_0": scene_info["1P"],
-            "player_1": scene_info[get_ai_name(self.team_num["player_0"])],
+        self._scene_infos = {
+            "green_team": scene_info["1P"],
+            "blue_team": scene_info[get_ai_name(self.team_num["green_team"])],
         }
-        self._prev_agent_infos = deepcopy(self._agent_infos)
+        self._prev_scene_infos = deepcopy(self._scene_infos)
         self._prev_actions = {agent: 0 for agent in self.agents}
 
         observations = {agent: self._observation(agent) for agent in self.agents}
@@ -228,33 +230,44 @@ class parallel_env(ParallelEnv):
         dict[AgentID, bool],
         dict[AgentID, dict[str, Any]],
     ]:
-        player = 0
         commands = {}
         for agent, action_id in actions.items():
             for i in range(self.team_num[agent]):
-                commands[get_ai_name(player)] = COMMANDS[ACTIONS[action_id][i]]
-                player += 1
-        self.game.update(commands)
+                tank_id = (
+                    0 if agent == "green_team" else self.team_num["green_team"]
+                ) + i
+                commands[get_ai_name(tank_id)] = COMMANDS[ACTIONS[action_id][i]]
+        self.game.update(deepcopy(commands))
 
         scene_info = self.game.get_data_from_game_to_player()
-        self._agent_infos = {
-            "player_0": scene_info["1P"],
-            "player_1": scene_info[get_ai_name(self.team_num["player_0"])],
+        self._scene_infos = {
+            "green_team": scene_info["1P"],
+            "blue_team": scene_info[get_ai_name(self.team_num["green_team"])],
         }
 
         observations = {agent: self._observation(agent) for agent in self.agents}
         rewards = {agent: self._reward(agent) for agent in self.agents}
-        terminations = {
-            agent: self._agent_infos[agent]["status"] != "GAME_ALIVE"
-            for agent in self.agents
-        }
+
+        # terminations = {
+        #     agent: self._scene_infos[agent]["status"] != "GAME_ALIVE"
+        #     for agent in self.agents
+        # }
+
+        if (
+            self._scene_infos["green_team"]["status"] != "GAME_ALIVE"
+            or self._scene_infos["green_team"]["teammate_info"][0]["oil"] == 0
+        ):
+            terminations = {agent: True for agent in self.agents}
+        else:
+            terminations = {agent: False for agent in self.agents}
+
         truncations = {agent: False for agent in self.agents}
         infos = {agent: {} for agent in self.agents}
 
         # Remove agents that are done
         self.agents = [agent for agent in self.agents if not terminations[agent]]
 
-        self._prev_agent_infos = deepcopy(self._agent_infos)
+        self._prev_scene_infos = deepcopy(self._scene_infos)
         self._prev_actions = actions
 
         if self.render_mode == "human":
@@ -263,8 +276,8 @@ class parallel_env(ParallelEnv):
         return observations, rewards, terminations, truncations, infos
 
     def _observation(self, agent: AgentID) -> np.ndarray:
-        agent_info = self._agent_infos[agent]
-        prev_agent_info = self._prev_agent_infos[agent]
+        scene_info = self._scene_infos[agent]
+        prev_scene_info = self._prev_scene_infos[agent]
 
         # Function to clip values between lower and upper bounds
         clip = lambda x, l, u: max(min(x, u), l)
@@ -276,12 +289,13 @@ class parallel_env(ParallelEnv):
 
         # Add friendly tanks
         for tank_info, prev_tank_info in zip(
-            agent_info["teammate_info"], prev_agent_info["teammate_info"]
+            scene_info["teammate_info"], prev_scene_info["teammate_info"]
         ):
             x = clip(tank_info["x"], 0, WIDTH)
-            y = clip(tank_info["x"], 0, HEIGHT)
+            y = clip(tank_info["y"], 0, HEIGHT)
             prev_x = clip(prev_tank_info["x"], 0, WIDTH)
-            prev_y = clip(prev_tank_info["x"], 0, HEIGHT)
+            prev_y = clip(prev_tank_info["y"], 0, HEIGHT)
+
             observation.extend(
                 [
                     x,
@@ -289,43 +303,43 @@ class parallel_env(ParallelEnv):
                     x - prev_x,
                     y - prev_y,
                     (tank_info["angle"] + 360) % 360,
-                    tank_info["lives"],
-                    tank_info["power"],
+                    # tank_info["lives"],
+                    # tank_info["power"],
                     tank_info["oil"],
                 ]
             )
 
-        # Pad with zeros if there are less than MAX_TANK_COUNT friendly tanks
-        observation.extend([0] * 8 * (MAX_TANK_NUM - len(agent_info["teammate_info"])))
+        # # Pad with zeros if there are less than MAX_TANK_COUNT friendly tanks
+        # observation.extend([0] * 8 * (MAX_TANK_NUM - len(scene_info["teammate_info"])))
 
-        # Add enemy tanks
-        for tank_info, prev_tank_info in zip(
-            agent_info["competitor_info"], prev_agent_info["competitor_info"]
-        ):
-            x = clip(tank_info["x"], 0, WIDTH)
-            y = clip(tank_info["x"], 0, HEIGHT)
-            prev_x = clip(prev_tank_info["x"], 0, WIDTH)
-            prev_y = clip(prev_tank_info["x"], 0, HEIGHT)
-            observation.extend(
-                [
-                    x,
-                    y,
-                    x - prev_x,
-                    y - prev_y,
-                    (tank_info["angle"] + 360) % 360,
-                    tank_info["lives"],
-                    tank_info["power"],
-                    tank_info["oil"],
-                ]
-            )
+        # # Add enemy tanks
+        # for tank_info, prev_tank_info in zip(
+        #     scene_info["competitor_info"], prev_scene_info["competitor_info"]
+        # ):
+        #     x = clip(tank_info["x"], 0, WIDTH)
+        #     y = clip(tank_info["y"], 0, HEIGHT)
+        #     prev_x = clip(prev_tank_info["x"], 0, WIDTH)
+        #     prev_y = clip(prev_tank_info["y"], 0, HEIGHT)
+        #     observation.extend(
+        #         [
+        #             x,
+        #             y,
+        #             x - prev_x,
+        #             y - prev_y,
+        #             (tank_info["angle"] + 360) % 360,
+        #             tank_info["lives"],
+        #             tank_info["power"],
+        #             tank_info["oil"],
+        #         ]
+        #     )
 
-        # Pad with zeros if there are less than MAX_TANK_COUNT friendly tanks
-        observation.extend(
-            [0] * 8 * (MAX_TANK_NUM - len(agent_info["competitor_info"]))
-        )
+        # # Pad with zeros if there are less than MAX_TANK_COUNT enemy tanks
+        # observation.extend(
+        #     [0] * 8 * (MAX_TANK_NUM - len(scene_info["competitor_info"]))
+        # )
 
         # Add oil stations
-        for oil_station_info in agent_info["oil_stations_info"]:
+        for oil_station_info in scene_info["oil_stations_info"]:
             observation.extend(
                 [
                     oil_station_info["x"],
@@ -333,97 +347,109 @@ class parallel_env(ParallelEnv):
                 ]
             )
 
-        # Add bullet stations
-        for bullet_station_info in agent_info["bullet_stations_info"]:
-            observation.extend(
-                [
-                    bullet_station_info["x"],
-                    bullet_station_info["y"],
-                ]
-            )
+        # # Add bullet stations
+        # for bullet_station_info in scene_info["bullet_stations_info"]:
+        #     observation.extend(
+        #         [
+        #             bullet_station_info["x"],
+        #             bullet_station_info["y"],
+        #         ]
+        #     )
 
-        # Add walls
-        for wall_info in agent_info["walls_info"]:
-            observation.extend([wall_info["x"], wall_info["y"], wall_info["lives"]])
+        # # Add walls
+        # for wall_info in scene_info["walls_info"]:
+        #     observation.extend([wall_info["x"], wall_info["y"], wall_info["lives"]])
 
-        # Pad with zeros if there are less than MAX_WALL_COUNT walls alive
-        observation.extend([0] * 3 * (MAX_WALL_NUM - len(agent_info["walls_info"])))
+        # # Pad with zeros if there are less than MAX_WALL_COUNT walls alive
+        # observation.extend([0] * 3 * (MAX_WALL_NUM - len(scene_info["walls_info"])))
 
-        # Add bullets
-        for bullet_info in agent_info["bullets_info"]:
-            angle = bullet_info["rot"]
-            speed = bullet_info["speed"]
+        # # Add bullets
+        # for bullet_info in scene_info["bullets_info"]:
+        #     angle = bullet_info["rot"]
+        #     speed = bullet_info["speed"]
 
-            if angle == 0 or angle == 360:
-                dx, dy = -speed, 0
-            elif angle == 315 or angle == -45:
-                dx, dy = -speed, -speed
-            elif angle == 270 or angle == -90:
-                dx, dy = 0, -speed
-            elif angle == 225 or angle == -135:
-                dx, dy = speed, -speed
-            elif angle == 180 or angle == -180:
-                dx, dy = speed, 0
-            elif angle == 135 or angle == -225:
-                dx, dy = speed, speed
-            elif angle == 90 or angle == -270:
-                dx, dy = 0, speed
-            else:
-                dx, dy = -speed, speed
+        #     if angle == 0 or angle == 360:
+        #         dx, dy = -speed, 0
+        #     elif angle == 315 or angle == -45:
+        #         dx, dy = -speed, -speed
+        #     elif angle == 270 or angle == -90:
+        #         dx, dy = 0, -speed
+        #     elif angle == 225 or angle == -135:
+        #         dx, dy = speed, -speed
+        #     elif angle == 180 or angle == -180:
+        #         dx, dy = speed, 0
+        #     elif angle == 135 or angle == -225:
+        #         dx, dy = speed, speed
+        #     elif angle == 90 or angle == -270:
+        #         dx, dy = 0, speed
+        #     else:
+        #         dx, dy = -speed, speed
 
-            observation.extend(
-                [
-                    clip(bullet_info["x"], 0, WIDTH),
-                    clip(bullet_info["y"], 0, HEIGHT),
-                    dx,
-                    dy,
-                ]
-            )
+        #     observation.extend(
+        #         [
+        #             clip(bullet_info["x"], 0, WIDTH),
+        #             clip(bullet_info["y"], 0, HEIGHT),
+        #             dx,
+        #             dy,
+        #         ]
+        #     )
 
-        # Pad with zeros if there are less than MAX_BULLET_COUNT bullets
-        observation.extend([0] * 4 * (MAX_BULLET_NUM - len(agent_info["bullets_info"])))
+        # # Pad with zeros if there are less than MAX_BULLET_COUNT bullets
+        # observation.extend([0] * 4 * (MAX_BULLET_NUM - len(scene_info["bullets_info"])))
 
         return np.array(observation, dtype=np.float32)
 
     def _reward(self, agent: AgentID) -> float:
         reward = 0.0
 
-        agent_info = self._agent_infos[agent]
-        prev_agent_info = self._prev_agent_infos[agent]
+        scene_info = self._scene_infos[agent]
+        prev_scene_info = self._prev_scene_infos[agent]
 
-        # Total lives of friendly tanks
-        lives = sum([tank["lives"] for tank in agent_info["teammate_info"]])
-        prev_lives = sum([tank["lives"] for tank in prev_agent_info["teammate_info"]])
+        # # Reward for attacking enemy tanks
+        # for tank, prev_tank in zip(
+        #     scene_info["competitor_info"], prev_scene_info["competitor_info"]
+        # ):
+        # tank_lives = tank["lives"]
+        # prev_tank_lives = prev_tank["lives"]
+        # if prev_tank_lives > tank_lives:
+        #     reward += (prev_tank_lives - tank_lives) / 3
+        #     if tank_lives == 0:
+        #         reward += 1
 
-        # Total lives of enemy tanks
-        enemy_lives = sum([tank["lives"] for tank in agent_info["competitor_info"]])
-        prev_enemy_lives = sum(
-            [tank["lives"] for tank in prev_agent_info["competitor_info"]]
-        )
-
-        # Total oil and power of friendly tanks
-        oil = sum([tank["oil"] for tank in agent_info["teammate_info"]])
-        power = sum([tank["power"] for tank in agent_info["teammate_info"]])
-        prev_oil = sum([tank["oil"] for tank in prev_agent_info["teammate_info"]])
-        prev_power = sum([tank["power"] for tank in prev_agent_info["teammate_info"]])
-
-        # Reward for attacking enemy tanks
-        reward += (prev_enemy_lives - enemy_lives) * 2
-
-        # Penalty for being attacked
-        reward -= (prev_lives - lives) * 2
-
-        # Reward for collecting oil
-        reward += (oil - prev_oil) * 0.01
-
-        # Reward for collecting power
-        reward += power - prev_power
-
-        # Encourage movement
         for tank, prev_tank in zip(
-            agent_info["teammate_info"], prev_agent_info["teammate_info"]
+            scene_info["teammate_info"], prev_scene_info["teammate_info"]
         ):
-            if tank["x"] == prev_tank["x"] and tank["y"] == prev_tank["y"]:
-                reward -= 1
+            # # Penalty for being attacked
+            # tank_lives = tank["lives"]
+            # prev_tank_lives = prev_tank["lives"]
+            # if prev_tank_lives > tank_lives:
+            #     reward -= (prev_tank_lives - tank_lives) / 3
+            #     if tank_lives == 0:
+            #         reward -= 1
+
+            # # +1e-3 per unit of oil collected, -1e-3 per unit of oil used
+            tank_oil = tank["oil"]
+            prev_tank_oil = prev_tank["oil"]
+            # reward += (tank_oil - prev_tank_oil) * 1e-3
+
+            if tank_oil > prev_tank_oil:
+                reward += 1
+
+            # # +0.02 per unit of ammo collected, -0.02 per unit of ammo used,
+            # # -0.0001 every timestep when out of ammo
+            # tank_power = tank["power"]
+            # prev_tank_power = prev_tank["power"]
+            # reward += (tank_power - prev_tank_power) * 0.02
+            # if tank_power == prev_tank_power and tank_power == 0:
+            #     reward -= 1e-4
+
+            # # +2e-5 every timestep when the tank is moving, else 1e-4 if the tank
+            # # stays stationary
+            # dx = tank["x"] - prev_tank["x"]
+            # dy = tank["y"] - prev_tank["y"]
+            # if dx != 0 or dy != 0:
+            #     reward += 2e-5
+            # else:
+            #     reward -= 1e-4
 
         return reward
