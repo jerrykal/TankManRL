@@ -86,7 +86,14 @@ class ResupplyEnv(TankManBaseEnv):
     def action_space(self) -> Discrete:
         return self._action_space
 
-    def _get_obs(self, scene_info: dict) -> np.ndarray:
+    @staticmethod
+    def get_obs(
+        player: str,
+        supply_type: str,
+        scene_info: dict,
+        prev_scene_info: dict,
+        prev_action: Optional[int] = None,
+    ) -> np.ndarray:
         # Function to calculate the quadrant of the given coordinate
         def calculate_quadrant(x: int, y: int) -> int:
             mid_x = WIDTH // 2
@@ -105,16 +112,16 @@ class ResupplyEnv(TankManBaseEnv):
         clip = lambda x, l, u: max(min(x, u), l)
 
         # Previous action
-        prev_action = self._prev_action or 0
+        prev_action = prev_action or 0
 
         # Player info
-        x = clip(scene_info[self.player]["x"], 0, WIDTH)
-        y = clip(scene_info[self.player]["y"], 0, HEIGHT)
-        angle = (scene_info[self.player]["angle"] + 360) % 360
+        x = clip(scene_info[player]["x"], 0, WIDTH)
+        y = clip(scene_info[player]["y"], 0, HEIGHT)
+        angle = (scene_info[player]["angle"] + 360) % 360
         player_quadrant = calculate_quadrant(x, y)
 
         # Supply station info
-        supply_stations = scene_info[self.player][self.supply_type + "_info"]
+        supply_stations = scene_info[player][supply_type + "_info"]
         supply_x, supply_y = None, None
         for station in supply_stations:
             supply_x, supply_y = station["x"], station["y"]
@@ -131,11 +138,21 @@ class ResupplyEnv(TankManBaseEnv):
         obs = np.array([prev_action, x, y, angle, supply_x, supply_y], dtype=np.float32)
         return obs
 
-    def _get_reward(self, scene_info: dict) -> float:
-        supply_stations = scene_info[self.player][self.supply_type + "_info"]
-        prev_supply_stations = self._prev_scene_info[self.player][
-            self.supply_type + "_info"
-        ]
+    def _get_obs(self, scene_info: dict) -> np.ndarray:
+        return self.get_obs(
+            self.player,
+            self.supply_type,
+            scene_info,
+            self._prev_scene_info,
+            self._prev_action,
+        )
+
+    @staticmethod
+    def get_reward(
+        player: str, supply_type: str, prev_scene_info: dict, scene_info: dict
+    ) -> float:
+        supply_stations = scene_info[player][supply_type + "_info"]
+        prev_supply_stations = prev_scene_info[player][supply_type + "_info"]
 
         # +1 for picking up a supply(supply station location changed)
         for station, prev_station in zip(supply_stations, prev_supply_stations):
@@ -143,6 +160,11 @@ class ResupplyEnv(TankManBaseEnv):
                 return 1
 
         return 0
+
+    def _get_reward(self, scene_info: dict) -> float:
+        return self.get_reward(
+            self.player, self.supply_type, scene_info, self._prev_scene_info
+        )
 
     def _is_done(self, scene_info: dict) -> bool:
         return (
