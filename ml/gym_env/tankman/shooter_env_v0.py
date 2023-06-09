@@ -101,26 +101,31 @@ class ShooterEnv(TankManBaseEnv):
         if self._game_view is not None:
             self._game_view.reset()
 
-        scene_info = self.game.get_data_from_game_to_player()
-        self._prev_scene_info = scene_info
+        self._scene_info = self.game.get_data_from_game_to_player()
+        self._prev_scene_info = self._scene_info
         self._prev_action = None
 
         # Pick closest competitor as target
         min_dist = 1e9
-        for competitor in scene_info[self.player]["competitor_info"]:
+        for competitor in self._scene_info[self.player]["competitor_info"]:
             competitor_x = competitor["x"]
             competitor_y = competitor["y"]
 
             # Find the closest competitor
             dist = np.linalg.norm(
                 np.array([competitor_x, competitor_y])
-                - np.array([scene_info[self.player]["x"], scene_info[self.player]["y"]])
+                - np.array(
+                    [
+                        self._scene_info[self.player]["x"],
+                        self._scene_info[self.player]["y"],
+                    ]
+                )
             )
             if dist < min_dist:
                 min_dist = dist
                 self.target_id = competitor["id"]
 
-        obs = self._get_obs(scene_info)
+        obs = self._get_obs()
 
         return obs, {}
 
@@ -142,9 +147,9 @@ class ShooterEnv(TankManBaseEnv):
 
         return target
 
-    def _get_obs(self, scene_info: dict) -> np.ndarray:
+    def _get_obs(self) -> np.ndarray:
         obs = []
-        player_info = scene_info[self.player]
+        player_info = self._scene_info[self.player]
 
         # Function to clip values between lower and upper bounds
         clip = lambda x, l, u: max(min(x, u), l)
@@ -179,7 +184,7 @@ class ShooterEnv(TankManBaseEnv):
             )
 
         # Competitor tank
-        target_info = self._get_target_info(scene_info)
+        target_info = self._get_target_info(self._scene_info)
         obs.extend(
             [
                 clip(target_info["x"], 0, WIDTH),
@@ -190,13 +195,13 @@ class ShooterEnv(TankManBaseEnv):
 
         return np.array(obs, dtype=np.float32)
 
-    def _get_reward(self, scene_info: dict) -> float:
+    def _get_reward(self) -> float:
         reward = -0.01
 
-        player_info = scene_info[self.player]
+        player_info = self._scene_info[self.player]
         prev_player_info = self._prev_scene_info[self.player]
 
-        target_info = self._get_target_info(scene_info)
+        target_info = self._get_target_info(self._scene_info)
         prev_target_info = self._get_target_info(self._prev_scene_info)
 
         # Penalty for firing a shot
@@ -214,13 +219,13 @@ class ShooterEnv(TankManBaseEnv):
 
         return reward
 
-    def _is_done(self, scene_info: dict) -> bool:
-        target_info = self._get_target_info(scene_info)
+    def _is_done(self) -> bool:
+        target_info = self._get_target_info(self._scene_info)
         return (
-            scene_info[self.player]["status"] != "GAME_ALIVE"
+            self._scene_info[self.player]["status"] != "GAME_ALIVE"
             or (
-                scene_info[self.player]["power"] == 0
-                and len(scene_info[self.player]["bullets_info"]) == 0
+                self._scene_info[self.player]["power"] == 0
+                and len(self._scene_info[self.player]["bullets_info"]) == 0
             )
             or target_info["lives"] == 0
         )

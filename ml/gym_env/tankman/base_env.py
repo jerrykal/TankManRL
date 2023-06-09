@@ -83,11 +83,11 @@ class TankManBaseEnv(gym.Env, ABC):
         if self._game_view is not None:
             self._game_view.reset()
 
-        scene_info = self.game.get_data_from_game_to_player()
-        self._prev_scene_info = scene_info
+        self._scene_info = self.game.get_data_from_game_to_player()
+        self._prev_scene_info = self._scene_info
         self._prev_action = None
 
-        obs = self._get_obs(scene_info)
+        obs = self._get_obs()
 
         return obs, {}
 
@@ -95,13 +95,13 @@ class TankManBaseEnv(gym.Env, ABC):
         commands = self._get_commands(action)
         self.game.update(deepcopy(commands))
 
-        scene_info = self.game.get_data_from_game_to_player()
+        self._scene_info = self.game.get_data_from_game_to_player()
 
-        obs = self._get_obs(scene_info)
-        reward = self._get_reward(scene_info)
-        terminate = self._is_done(scene_info)
+        obs = self._get_obs()
+        reward = self._get_reward()
+        terminate = self._is_done()
 
-        self._prev_scene_info = scene_info
+        self._prev_scene_info = self._scene_info
         self._prev_action = action
 
         return obs, reward, terminate, False, {}
@@ -117,15 +117,15 @@ class TankManBaseEnv(gym.Env, ABC):
         pass
 
     @abstractmethod
-    def _get_obs(self, scene_info: dict) -> np.ndarray:
+    def _get_obs(self) -> np.ndarray:
         pass
 
     @abstractmethod
-    def _get_reward(self, scene_info: dict) -> float:
+    def _get_reward(self) -> float:
         pass
 
     @abstractmethod
-    def _is_done(self, scene_info: dict) -> bool:
+    def _is_done(self) -> bool:
         pass
 
     @abstractmethod

@@ -138,11 +138,11 @@ class ResupplyEnv(TankManBaseEnv):
         obs = np.array([prev_action, x, y, angle, supply_x, supply_y], dtype=np.float32)
         return obs
 
-    def _get_obs(self, scene_info: dict) -> np.ndarray:
+    def _get_obs(self) -> np.ndarray:
         return self.get_obs(
             self.player,
             self.supply_type,
-            scene_info,
+            self._scene_info,
             self._prev_scene_info,
             self._prev_action,
         )
@@ -161,15 +161,15 @@ class ResupplyEnv(TankManBaseEnv):
 
         return 0
 
-    def _get_reward(self, scene_info: dict) -> float:
+    def _get_reward(self) -> float:
         return self.get_reward(
-            self.player, self.supply_type, scene_info, self._prev_scene_info
+            self.player, self.supply_type, self._scene_info, self._prev_scene_info
         )
 
-    def _is_done(self, scene_info: dict) -> bool:
+    def _is_done(self) -> bool:
         return (
-            scene_info[self.player]["status"] != "GAME_ALIVE"
-            or scene_info[self.player]["oil"] == 0
+            self._scene_info[self.player]["status"] != "GAME_ALIVE"
+            or self._scene_info[self.player]["oil"] == 0
         )
 
     def _get_commands(self, action: int) -> dict:
