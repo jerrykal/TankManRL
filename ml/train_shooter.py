@@ -19,17 +19,17 @@ def parser_arg() -> Namespace:
     # Environment configuration
     parser.add_argument("--green-team-num", type=int, default=3, choices=[1, 2, 3])
     parser.add_argument("--blue-team-num", type=int, default=3, choices=[1, 2, 3])
-    parser.add_argument("--stack-num", type=int, default=2)
+    parser.add_argument("--stack-num", type=int, default=4)
     parser.add_argument("--frame-limit", type=int, default=1000)
 
     # Training Hyperparameters
-    parser.add_argument("--total-time-steps", type=int, default=10000000)
+    parser.add_argument("--total-time-steps", type=int, default=80000000)
     parser.add_argument("--n-envs", type=int, default=4)
 
     # PPO Hyperparameters
-    parser.add_argument("--hidden-sizes", type=int, nargs="*", default=[64, 64])
+    parser.add_argument("--hidden-sizes", type=int, nargs="*", default=[256, 256])
     parser.add_argument("--batch-size", type=int, default=256)
-    parser.add_argument("--step-per-update", type=int, default=2000)
+    parser.add_argument("--step-per-update", type=int, default=2048)
     parser.add_argument("--repeat-per-update", type=float, default=10)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--gamma", type=float, default=0.99)
@@ -49,7 +49,7 @@ def train(opts: Namespace) -> None:
     vec_env = make_vec_env(
         get_env,
         env_kwargs={  # This one is for the envwrapper
-            "env_id": "TankManResupply-v0",
+            "env_id": "TankManShooter-v0",
             "stack_num": opts.stack_num,
             "env_kwargs": {  # This one is for the actually env
                 "green_team_num": opts.green_team_num,
@@ -89,7 +89,7 @@ def train(opts: Namespace) -> None:
     print(model.policy)
 
     # Logger
-    log_path = f"log/sb3/train_resupply_{time.strftime('%b%d_%Y_%H-%M-%S')}"
+    log_path = f"log/sb3/train_shooter_{time.strftime('%b%d_%Y_%H-%M-%S')}"
     logger = configure(log_path, ["stdout", "tensorboard"])
     model.set_logger(logger)
 
@@ -99,7 +99,7 @@ def train(opts: Namespace) -> None:
         save_path=os.path.join(log_path, "weights"),
     )
     eval_env = get_env(
-        env_id="TankManResupply-v0",
+        env_id="TankManShooter-v0",
         stack_num=opts.stack_num,
         env_kwargs={
             "green_team_num": opts.green_team_num,
