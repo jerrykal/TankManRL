@@ -21,9 +21,12 @@ def parse_args() -> Namespace:
     )
 
     # Environment configuration
+    parser.add_argument(
+        "--env-id", type=str, choices=["TankManShooter-v0", "TankManResupply-v0"]
+    )
     parser.add_argument("--green-team-num", type=int, default=3, choices=[1, 2, 3])
     parser.add_argument("--blue-team-num", type=int, default=3, choices=[1, 2, 3])
-    parser.add_argument("--stack-num", type=int, default=2)
+    parser.add_argument("--stack-num", type=int, default=4)
     parser.add_argument("--frame-limit", type=int, default=2000)
     parser.add_argument("--determinstic", action="store_true")
 
@@ -38,7 +41,7 @@ if __name__ == "__main__":
 
     # Create environment
     env = get_env(
-        env_id="TankManResupply-v0",
+        env_id=opts.env_id,
         stack_num=opts.stack_num,
         env_kwargs={
             "green_team_num": opts.green_team_num,
