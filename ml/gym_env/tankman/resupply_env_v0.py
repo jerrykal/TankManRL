@@ -13,14 +13,12 @@ from mlgame.utils.enum import get_ai_name
 
 from src.env import BACKWARD_CMD, FORWARD_CMD, LEFT_CMD, RIGHT_CMD
 
-if __name__ != "__main__":
-    from .base_env import TankManBaseEnv
-else:
-    from base_env import TankManBaseEnv
+from .base_env import TankManBaseEnv
 
 WIDTH = 1000
 HEIGHT = 600
 COMMAND = [
+    ["NONE"],
     [FORWARD_CMD],
     [BACKWARD_CMD],
     [LEFT_CMD],
@@ -91,7 +89,6 @@ class ResupplyEnv(TankManBaseEnv):
         player: str,
         supply_type: str,
         scene_info: dict,
-        prev_scene_info: dict,
         prev_action: Optional[int] = None,
     ) -> np.ndarray:
         # Function to calculate the quadrant of the given coordinate
@@ -143,7 +140,6 @@ class ResupplyEnv(TankManBaseEnv):
             self.player,
             self.supply_type,
             self._scene_info,
-            self._prev_scene_info,
             self._prev_action,
         )
 

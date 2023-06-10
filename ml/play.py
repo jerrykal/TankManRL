@@ -1,11 +1,6 @@
 from argparse import ArgumentParser, Namespace
 
 import gym_env.tankman
-import gymnasium as gym
-import supersuit as ss
-from gymnasium.wrappers.flatten_observation import FlattenObservation
-from gymnasium.wrappers.frame_stack import FrameStack
-from sb3_contrib import RecurrentPPO
 from stable_baselines3 import PPO
 from utils import get_env
 
@@ -54,9 +49,8 @@ if __name__ == "__main__":
 
     # Play!
     obs, _ = env.reset()
-    lstm_states = None
     while True:
-        action, _ = model.predict(obs, deterministic=opts.determinstic)  # type: ignore
+        action, _ = model.predict(obs, deterministic=opts.determinstic)
         obs, reward, terminate, truncated, _ = env.step(action)
 
         env.render()

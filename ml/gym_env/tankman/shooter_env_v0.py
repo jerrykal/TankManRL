@@ -13,10 +13,7 @@ from mlgame.utils.enum import get_ai_name
 
 from src.env import BACKWARD_CMD, FORWARD_CMD, LEFT_CMD, RIGHT_CMD, SHOOT
 
-if __name__ != "__main__":
-    from .base_env import TankManBaseEnv
-else:
-    from base_env import TankManBaseEnv
+from .base_env import TankManBaseEnv
 
 WIDTH = 1000
 HEIGHT = 600
@@ -76,13 +73,18 @@ class ShooterEnv(TankManBaseEnv):
         # x, y, lives
         tank_obs = Box(low=0, high=np.array([WIDTH, HEIGHT, 3]), dtype=np.float32)
 
+        # bullet_x, bullet_y
+        bullet_obs = Box(low=0, high=np.array([WIDTH, HEIGHT]), dtype=np.float32)
+
         # Player tank + 2 teammate tank and 1 competitor tank
         self._observation_space = flatten_space(
             Tuple(
                 [
                     prev_action_obs,
                     player_tank_obs,
-                    *[tank_obs] * 3,
+                    *[tank_obs] * 2,  # Teammate
+                    *[tank_obs] * 1,  # Target
+                    *[bullet_obs] * MAX_BULLET_NUM,
                 ]
             )
         )
@@ -96,38 +98,9 @@ class ShooterEnv(TankManBaseEnv):
         if self.randomize:
             self.player = get_ai_name(np.random.randint(self.player_num))
 
-        # Reset the game
-        self.game.reset()
-        if self._game_view is not None:
-            self._game_view.reset()
+        self.target_id = None
 
-        self._scene_info = self.game.get_data_from_game_to_player()
-        self._prev_scene_info = self._scene_info
-        self._prev_action = None
-
-        # Pick closest competitor as target
-        min_dist = 1e9
-        for competitor in self._scene_info[self.player]["competitor_info"]:
-            competitor_x = competitor["x"]
-            competitor_y = competitor["y"]
-
-            # Find the closest competitor
-            dist = np.linalg.norm(
-                np.array([competitor_x, competitor_y])
-                - np.array(
-                    [
-                        self._scene_info[self.player]["x"],
-                        self._scene_info[self.player]["y"],
-                    ]
-                )
-            )
-            if dist < min_dist:
-                min_dist = dist
-                self.target_id = competitor["id"]
-
-        obs = self._get_obs()
-
-        return obs, {}
+        return super().reset(seed=seed, options=options)
 
     @property
     def observation_space(self) -> Box:
@@ -136,6 +109,14 @@ class ShooterEnv(TankManBaseEnv):
     @property
     def action_space(self) -> Discrete:
         return self._action_space
+
+    def _get_bullets_info(self) -> list:
+        bullets_info = []
+        for bullet_info in self._scene_info[self.player]["bullets_info"]:
+            if bullet_info["id"] == f"{self.player}_bullet":
+                bullets_info.append(bullet_info)
+
+        return bullets_info
 
     def _get_target_info(self, scene_info: dict) -> dict:
         assert self.target_id is not None
@@ -183,7 +164,28 @@ class ShooterEnv(TankManBaseEnv):
                 ]
             )
 
-        # Competitor tank
+        # Picking a target
+        if self.target_id == None:
+            min_dist = 1e9
+            for competitor in self._scene_info[self.player]["competitor_info"]:
+                competitor_x = competitor["x"]
+                competitor_y = competitor["y"]
+
+                # Find the closest competitor
+                dist = np.linalg.norm(
+                    np.array([competitor_x, competitor_y])
+                    - np.array(
+                        [
+                            self._scene_info[self.player]["x"],
+                            self._scene_info[self.player]["y"],
+                        ]
+                    )
+                )
+                if dist < min_dist:
+                    min_dist = dist
+                    self.target_id = competitor["id"]
+
+        # Target tank
         target_info = self._get_target_info(self._scene_info)
         obs.extend(
             [
@@ -192,6 +194,19 @@ class ShooterEnv(TankManBaseEnv):
                 target_info["lives"],
             ]
         )
+
+        # Bullets
+        bullets_info = self._get_bullets_info()
+        for bullet_info in bullets_info:
+            obs.extend(
+                [
+                    clip(bullet_info["x"], 0, WIDTH),
+                    clip(bullet_info["y"], 0, HEIGHT),
+                ]
+            )
+
+        # Pad with zeros
+        obs.extend([0, 0] * (MAX_BULLET_NUM - len(bullets_info)))
 
         return np.array(obs, dtype=np.float32)
 
@@ -225,8 +240,9 @@ class ShooterEnv(TankManBaseEnv):
             self._scene_info[self.player]["status"] != "GAME_ALIVE"
             or (
                 self._scene_info[self.player]["power"] == 0
-                and len(self._scene_info[self.player]["bullets_info"]) == 0
+                and len(self._get_bullets_info()) == 0
             )
+            or self._scene_info[self.player]["oil"] == 0
             or target_info["lives"] == 0
         )
 
@@ -244,6 +260,7 @@ if __name__ == "__main__":
         print(obs.shape)
         for _ in range(1000):
             obs, reward, terminate, _, _ = env.step(env.action_space.sample())  # type: ignore
+            print(obs)
 
             env.render()
             if terminate:

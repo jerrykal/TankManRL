@@ -84,8 +84,8 @@ class TankManBaseEnv(gym.Env, ABC):
             self._game_view.reset()
 
         self._scene_info = self.game.get_data_from_game_to_player()
-        self._prev_scene_info = self._scene_info
-        self._prev_action = None
+        self._action = 0
+        self._prev_action = 0
 
         obs = self._get_obs()
 
@@ -95,13 +95,14 @@ class TankManBaseEnv(gym.Env, ABC):
         commands = self._get_commands(action)
         self.game.update(deepcopy(commands))
 
+        self._action = action
+        self._prev_scene_info = deepcopy(self._scene_info)
         self._scene_info = self.game.get_data_from_game_to_player()
 
         obs = self._get_obs()
         reward = self._get_reward()
         terminate = self._is_done()
 
-        self._prev_scene_info = self._scene_info
         self._prev_action = action
 
         return obs, reward, terminate, False, {}

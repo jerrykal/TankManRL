@@ -19,11 +19,11 @@ def parser_arg() -> Namespace:
     # Environment configuration
     parser.add_argument("--green-team-num", type=int, default=3, choices=[1, 2, 3])
     parser.add_argument("--blue-team-num", type=int, default=3, choices=[1, 2, 3])
-    parser.add_argument("--stack-num", type=int, default=4)
+    parser.add_argument("--stack-num", type=int, default=2)
     parser.add_argument("--frame-limit", type=int, default=1000)
 
     # Training Hyperparameters
-    parser.add_argument("--total-time-steps", type=int, default=80000000)
+    parser.add_argument("--total-time-steps", type=int, default=30000000)
     parser.add_argument("--n-envs", type=int, default=4)
 
     # PPO Hyperparameters
@@ -51,6 +51,7 @@ def train(opts: Namespace) -> None:
         env_kwargs={  # This one is for the envwrapper
             "env_id": "TankManShooter-v0",
             "stack_num": opts.stack_num,
+            "action_mask": False,
             "env_kwargs": {  # This one is for the actually env
                 "green_team_num": opts.green_team_num,
                 "blue_team_num": opts.blue_team_num,
@@ -101,6 +102,7 @@ def train(opts: Namespace) -> None:
     eval_env = get_env(
         env_id="TankManShooter-v0",
         stack_num=opts.stack_num,
+        action_mask=False,
         env_kwargs={
             "green_team_num": opts.green_team_num,
             "blue_team_num": opts.blue_team_num,
