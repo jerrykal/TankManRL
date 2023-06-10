@@ -1,2 +1,6 @@
-pytmx == 3.31
+pytmx==3.31
 mlgame
+rich
+pettingzoo==1.23
+supersuit==3.8
+git+https://github.com/DLR-RM/stable-baselines3
