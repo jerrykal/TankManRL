@@ -2,6 +2,7 @@ from os import path
 
 import pygame
 
+IS_DEBUG = False
 # TODO remove width and height setting
 '''width and height'''
 WINDOW_WIDTH = 1000

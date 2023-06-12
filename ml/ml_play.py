@@ -4,8 +4,7 @@ The template of the main script of the machine learning process
 import random
 import pygame
 
-
-is_debug = False
+from src.env import IS_DEBUG
 
 
 class MLPlay:
@@ -46,7 +45,7 @@ class MLPlay:
         elif act == 4:
             command.append("BACKWARD")
 
-        if is_shoot and not is_debug:
+        if is_shoot and not IS_DEBUG:
             command.append("SHOOT")
 
         if self.side == "1P":

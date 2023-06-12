@@ -18,8 +18,6 @@ from .collide_hit_rect import *
 from .env import *
 from .game_module.fuctions import set_topleft, add_score, set_shoot
 
-is_test = False
-
 
 class TeamBattleMode:
     def __init__(self, green_team_num: int, blue_team_num: int, is_manual: bool, frame_limit: int, sound_path: str, play_rect_area: pygame.Rect):
@@ -28,7 +26,7 @@ class TeamBattleMode:
         self.sound_path = sound_path
         self.green_team_num = green_team_num
         self.blue_team_num = blue_team_num if (6 - (green_team_num + blue_team_num)) >= 0 else (6 - green_team_num)
-        self.map_name = f"map_{green_team_num}_v_{self.blue_team_num}.tmx" if not is_test else f"test_map_{green_team_num}_v_{self.blue_team_num}.tmx"
+        self.map_name = f"map_{green_team_num}_v_{self.blue_team_num}.tmx" if not IS_DEBUG else f"test_map_{green_team_num}_v_{self.blue_team_num}.tmx"
         self.map_path = path.join(MAP_DIR, self.map_name)
         self.map = TiledMap(self.map_path)
         self.scene_width = self.map.map_width
@@ -44,8 +42,8 @@ class TeamBattleMode:
         self.frame_limit = frame_limit
         self.is_manual = is_manual
         self.obj_rect_list = []
-        self.team_a_score = 0
-        self.team_b_score = 0
+        self.team_green_score = 0
+        self.team_blue_score = 0
 
         # control variables
         self.is_invincible = False
@@ -105,8 +103,8 @@ class TeamBattleMode:
 
     def update(self, command: dict):
         # refactor
-        self.team_a_score = sum([player.score for player in self.players_a if isinstance(player, Player)])
-        self.team_b_score = sum([player.score for player in self.players_b if isinstance(player, Player)])
+        self.team_green_score = sum([player.score for player in self.players_a if isinstance(player, Player)])
+        self.team_blue_score = sum([player.score for player in self.players_b if isinstance(player, Player)])
         self.used_frame += 1
         self.check_collisions()
         self.walls.update()
@@ -124,24 +122,24 @@ class TeamBattleMode:
         self.change_obj_pos(self.all_players)
 
     def get_player_end(self):
-        is_alive_team_a = False
-        is_alive_team_b = False
+        is_alive_team_green = False
+        is_alive_team_blue = False
         for player in self.all_players:
             if isinstance(player, Player) and player.is_alive:
-                if player.no > self.green_team_num and not is_alive_team_b:
-                    is_alive_team_b = True
+                if player.no > self.green_team_num and not is_alive_team_blue:
+                    is_alive_team_blue = True
                 elif player.no <= self.green_team_num:
-                    is_alive_team_a = True
+                    is_alive_team_green = True
 
-        if not is_alive_team_b:
+        if not is_alive_team_blue:
             self.set_result(GameResultState.FINISH, "GREEN_TEAM_WIN")
-        elif not is_alive_team_a:
+        elif not is_alive_team_green:
             self.set_result(GameResultState.FINISH, "BLUE_TEAM_WIN")
 
     def get_game_end(self):
-        if self.team_a_score > self.team_b_score:
+        if self.team_green_score > self.team_blue_score:
             self.set_result(GameResultState.FINISH, "GREEN_TEAM_WIN")
-        elif self.team_a_score < self.team_b_score:
+        elif self.team_green_score < self.team_blue_score:
             self.set_result(GameResultState.FINISH, "BLUE_TEAM_WIN")
         else:
             self.set_result(GameResultState.FINISH, GameStatus.GAME_DRAW)
@@ -284,7 +282,7 @@ class TeamBattleMode:
                                                  "24px Arial BOLD"))
         x = 24
         y = 20
-        for score in range(min(self.team_a_score,self. team_b_score)):
+        for score in range(min(self.team_green_score, self. team_blue_score)):
             toggle_data.append(create_rect_view_data(name="score", x=x, y=y, width=1, height=10, color=ORANGE))
             x += 1.5
             if x > self.width_center:
@@ -293,8 +291,8 @@ class TeamBattleMode:
                 else:
                     y = 32
                 x = 24
-        for score in range(abs(self.team_a_score -self. team_b_score)):
-            if self.team_a_score > self.team_b_score:
+        for score in range(abs(self.team_green_score - self. team_blue_score)):
+            if self.team_green_score > self.team_blue_score:
                 toggle_data.append(create_rect_view_data("score", x, y, 1, 10, DARKGREEN))
             else:
                 toggle_data.append(create_rect_view_data("score", x, y, 1, 10, BLUE))
@@ -308,11 +306,11 @@ class TeamBattleMode:
         # 1P
         x = WINDOW_WIDTH - 125
         y = WINDOW_HEIGHT - 40
-        toggle_data.append(create_text_view_data(f"Score: {self.team_a_score}", x, y, DARKGREEN, "24px Arial BOLD"))
+        toggle_data.append(create_text_view_data(f"Score: {self.team_green_score}", x, y, DARKGREEN, "24px Arial BOLD"))
         # 2P
         x = 5
         y = WINDOW_HEIGHT - 40
-        toggle_data.append(create_text_view_data(f"Score: {self.team_b_score}", x, y, BLUE, "24px Arial BOLD"))
+        toggle_data.append(create_text_view_data(f"Score: {self.team_blue_score}", x, y, BLUE, "24px Arial BOLD"))
         for player in self.all_players:
             if isinstance(player, Player) and player.is_alive:
                 # lives

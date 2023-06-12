@@ -62,7 +62,7 @@ class Bullet(pygame.sprite.Sprite):
                                       self.angle)
 
     def get_data_from_obj_to_game(self) -> dict:
-        info = {"id": f"{self.id}P_bullet",
+        info = {"id": f"{self.no}P_bullet",
                 "x": self.rect.x,
                 "y": self.rect.y,
                 "speed": self.speed,

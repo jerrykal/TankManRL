@@ -5,10 +5,9 @@ from mlgame.utils.enum import get_ai_name
 from mlgame.view.view_model import create_asset_init_data, create_image_view_data, create_rect_view_data
 
 from .env import LEFT_CMD, RIGHT_CMD, FORWARD_CMD, BACKWARD_CMD, SHOOT, SHOOT_COOLDOWN, \
-    IMAGE_DIR, ORANGE, BLUE
+    IMAGE_DIR, ORANGE, BLUE, IS_DEBUG
 
 Vec = pygame.math.Vector2
-is_debug = False
 
 
 class Player(pygame.sprite.Sprite):
@@ -79,6 +78,8 @@ class Player(pygame.sprite.Sprite):
             self.lives = 0
 
         if not self.is_alive:
+            self.rect.topleft = Vec(self.play_rect_area.left + self.origin_size[0]*self.no
+                                    , self.play_rect_area.top - self.origin_size[1]*2)
             return
 
         self.rotate()
@@ -125,7 +126,6 @@ class Player(pygame.sprite.Sprite):
             self.is_forward = False
             self.is_backward = False
             self.is_turn_right = False
-            self.action_history.append('left')
         elif RIGHT_CMD == command and not self.is_turn_right and LEFT_CMD != command:
             self.oil -= 0.1
             self.turn_right()
@@ -133,7 +133,6 @@ class Player(pygame.sprite.Sprite):
             self.is_forward = False
             self.is_backward = False
             self.is_turn_left = False
-            self.action_history.append('right')
         elif FORWARD_CMD == command and BACKWARD_CMD != command:
             self.oil -= 0.1
             self.forward()
@@ -141,7 +140,7 @@ class Player(pygame.sprite.Sprite):
             self.is_backward = False
             self.is_turn_right = False
             self.is_turn_left = False
-            self.action_history.append('forward')
+            self.action_history.append(FORWARD_CMD)
         elif BACKWARD_CMD == command and FORWARD_CMD != command:
             self.oil -= 0.1
             self.backward()
@@ -149,7 +148,7 @@ class Player(pygame.sprite.Sprite):
             self.is_forward = False
             self.is_turn_right = False
             self.is_turn_left = False
-            self.action_history.append('backward')
+            self.action_history.append(BACKWARD_CMD)
 
         self.action_history = self.action_history[-1:]
 
@@ -224,14 +223,10 @@ class Player(pygame.sprite.Sprite):
 
         # Reverse actions
         for action in reversed(last_actions):
-            if action == 'forward':
+            if action == FORWARD_CMD:
                 self.backward()
-            elif action == 'backward':
+            elif action == BACKWARD_CMD:
                 self.forward()
-            elif action == 'left':
-                self.turn_right()
-            elif action == 'right':
-                self.turn_left()
 
     def collide_with_bullets(self):
         self.lives -= 1
@@ -293,7 +288,7 @@ class Player(pygame.sprite.Sprite):
                 , "score": self.score
                 , "lives": self.lives
                 }
-        if is_debug:
+        if IS_DEBUG:
             if self.rect.right > self.play_rect_area.right \
                     or self.rect.left < self.play_rect_area.left \
                     or self.rect.bottom > self.play_rect_area.bottom \
