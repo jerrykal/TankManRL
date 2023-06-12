@@ -110,25 +110,36 @@ class TankManBaseEnv(gym.Env, ABC):
     @property
     @abstractmethod
     def observation_space(self) -> gym.Space:
-        pass
+        """
+        Return the observation space.
+        Make sure the low, and high values are properly defined
+        See: https://gymnasium.farama.org/api/spaces/fundamental/
+        """
 
     @property
     @abstractmethod
     def action_space(self) -> gym.Space:
-        pass
+        """
+        Return the action space.
+        Make sure the low, and high values are properly defined
+        See: https://gymnasium.farama.org/api/spaces/fundamental/
+        """
 
     @abstractmethod
     def _get_obs(self) -> np.ndarray:
-        pass
+        """
+        Return the current observation.
+        Make sure the values returned are matched with the observation_space.
+        """
 
     @abstractmethod
     def _get_reward(self) -> float:
-        pass
+        """Return the reward."""
 
     @abstractmethod
     def _is_done(self) -> bool:
-        pass
+        """Return the done state."""
 
     @abstractmethod
     def _get_commands(self, action: int) -> dict:
-        pass
+        """Return the command for the game."""

@@ -31,28 +31,37 @@ COMMAND = [
 
 MAX_BULLET_NUM = 20
 
+TRANSITION_MATRIX = [
+    [0.8, 0.0, 0.1, 0.1],
+    [0.0, 0.8, 0.1, 0.1],
+    [0.4, 0.4, 0.2, 0.0],
+    [0.4, 0.4, 0.0, 0.2],
+]
+
 
 class ShooterEnv(TankManBaseEnv):
     def __init__(
         self,
-        green_team_num: int,
-        blue_team_num: int,
         frame_limit: int,
         player: Optional[str] = None,
-        randomize: Optional[bool] = False,
+        shuffle: Optional[bool] = False,
+        npc_random_movement: Optional[bool] = False,
         sound: str = "off",
         render_mode: Optional[str] = None,
     ) -> None:
-        super().__init__(green_team_num, blue_team_num, frame_limit, sound, render_mode)
+        super().__init__(3, 3, frame_limit, sound, render_mode)
 
-        self.player_num = green_team_num + blue_team_num
-        self.randomize = randomize
+        self.player_num = 3 + 3
+        self.shuffle = shuffle
+        self.npc_random_movement = npc_random_movement
+
+        self._prev_all_actions = [0] * 6
 
         # Target tank
         self.target_id = None
 
-        # Randomize the player
-        if self.randomize:
+        # Shuffle the player
+        if self.shuffle:
             self.player = get_ai_name(np.random.randint(self.player_num))
         else:
             assert player is not None
@@ -94,9 +103,11 @@ class ShooterEnv(TankManBaseEnv):
     def reset(
         self, seed: Optional[int] = None, options: Optional[dict] = None
     ) -> tuple[np.ndarray, dict]:
-        # Randomize the player
-        if self.randomize:
+        # Shuffle the player
+        if self.shuffle:
             self.player = get_ai_name(np.random.randint(self.player_num))
+
+        self._prev_all_actions = [0] * 6
 
         self.target_id = None
 
@@ -121,9 +132,9 @@ class ShooterEnv(TankManBaseEnv):
     def _get_target_info(self, scene_info: dict) -> dict:
         assert self.target_id is not None
         target = {}
-        for competitor in scene_info[self.player]["competitor_info"]:
-            if competitor["id"] == self.target_id:
-                target = competitor
+        for competitor_info in scene_info[self.player]["competitor_info"]:
+            if competitor_info["id"] == self.target_id:
+                target = competitor_info
                 break
 
         return target
@@ -165,28 +176,37 @@ class ShooterEnv(TankManBaseEnv):
             )
 
         # Picking a target
-        if self.target_id == None:
+        target_info = (
+            self._get_target_info(self._scene_info)
+            if self.target_id is not None
+            else None
+        )
+        if target_info is None or target_info["lives"] == 0:
             min_dist = 1e9
-            for competitor in self._scene_info[self.player]["competitor_info"]:
-                competitor_x = competitor["x"]
-                competitor_y = competitor["y"]
+            self.target_id = player_info["competitor_info"][0]["id"]
+            for competitor_info in player_info["competitor_info"]:
+                if competitor_info["lives"] == 0:
+                    continue
+
+                competitor_x = competitor_info["x"]
+                competitor_y = competitor_info["y"]
 
                 # Find the closest competitor
                 dist = np.linalg.norm(
                     np.array([competitor_x, competitor_y])
                     - np.array(
                         [
-                            self._scene_info[self.player]["x"],
-                            self._scene_info[self.player]["y"],
+                            player_info["x"],
+                            player_info["y"],
                         ]
                     )
                 )
                 if dist < min_dist:
                     min_dist = dist
-                    self.target_id = competitor["id"]
+                    self.target_id = competitor_info["id"]
 
-        # Target tank
-        target_info = self._get_target_info(self._scene_info)
+            target_info = self._get_target_info(self._scene_info)
+
         obs.extend(
             [
                 clip(target_info["x"], 0, WIDTH),
@@ -211,7 +231,11 @@ class ShooterEnv(TankManBaseEnv):
         return np.array(obs, dtype=np.float32)
 
     def _get_reward(self) -> float:
-        reward = -0.01
+        bullets_info = self._get_bullets_info()
+        if len(bullets_info) == 0:
+            reward = -0.01
+        else:
+            reward = -0.001
 
         player_info = self._scene_info[self.player]
         prev_player_info = self._prev_scene_info[self.player]
@@ -224,13 +248,13 @@ class ShooterEnv(TankManBaseEnv):
             reward += -0.1
 
         # Reward for hitting the target
-        reward += (prev_target_info["lives"] - target_info["lives"]) * 2
+        reward += (prev_target_info["lives"] - target_info["lives"]) * 3
 
         # Penalty for hitting teammate
         for teammate_info, prev_teammate_info in zip(
             player_info["teammate_info"], prev_player_info["teammate_info"]
         ):
-            reward += -(prev_teammate_info["lives"] - teammate_info["lives"]) * 2
+            reward += -(prev_teammate_info["lives"] - teammate_info["lives"]) * 3
 
         return reward
 
@@ -240,20 +264,36 @@ class ShooterEnv(TankManBaseEnv):
             self._scene_info[self.player]["status"] != "GAME_ALIVE"
             or (
                 self._scene_info[self.player]["power"] == 0
-                and len(self._get_bullets_info()) == 0
+                and len(self._scene_info[self.player]["bullets_info"]) == 0
             )
-            or self._scene_info[self.player]["oil"] == 0
-            or target_info["lives"] == 0
+            or sum(
+                [
+                    competitor_info["lives"]
+                    for competitor_info in self._scene_info[self.player][
+                        "competitor_info"
+                    ]
+                ]
+            )
+            == 0
         )
 
     def _get_commands(self, action: int) -> dict:
-        commands = {get_ai_name(id): ["NONE"] for id in range(self.player_num)}
+        if self.npc_random_movement:
+            commands = {}
+            for id, prev_act in enumerate(self._prev_all_actions):
+                new_action = np.random.choice(
+                    np.arange(4), p=TRANSITION_MATRIX[prev_act]
+                )
+                self._prev_all_actions[id] = new_action
+                commands[get_ai_name(id)] = COMMAND[new_action]
+        else:
+            commands = {get_ai_name(id): ["NONE"] for id in range(self.player_num)}
         commands[self.player] = COMMAND[action]
         return commands
 
 
 if __name__ == "__main__":
-    env = ShooterEnv(3, 3, 100, randomize=True, render_mode="human")
+    env = ShooterEnv(frame_limit=100, shuffle=True, render_mode="human")
     print(env.observation_space)
     for _ in range(10):
         obs, _ = env.reset()

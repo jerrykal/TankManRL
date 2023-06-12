@@ -17,8 +17,6 @@ def parser_arg() -> Namespace:
     parser = ArgumentParser()
 
     # Environment configuration
-    parser.add_argument("--green-team-num", type=int, default=3, choices=[1, 2, 3])
-    parser.add_argument("--blue-team-num", type=int, default=3, choices=[1, 2, 3])
     parser.add_argument("--stack-num", type=int, default=2)
     parser.add_argument("--frame-limit", type=int, default=1000)
 
@@ -52,10 +50,8 @@ def train(opts: Namespace) -> None:
             "env_id": "TankManResupply-v0",
             "stack_num": opts.stack_num,
             "env_kwargs": {  # This one is for the actually env
-                "green_team_num": opts.green_team_num,
-                "blue_team_num": opts.blue_team_num,
                 "frame_limit": opts.frame_limit,
-                "randomize": True,
+                "shuffle": True,
                 "render_mode": None,
             },
         },
@@ -102,17 +98,14 @@ def train(opts: Namespace) -> None:
         env_id="TankManResupply-v0",
         stack_num=opts.stack_num,
         env_kwargs={
-            "green_team_num": opts.green_team_num,
-            "blue_team_num": opts.blue_team_num,
             "frame_limit": opts.frame_limit,
-            "randomize": True,
+            "shuffle": True,
         },
     )
     eval_env = Monitor(eval_env)
     eval_callback = EvalCallback(
         eval_env=eval_env,
         eval_freq=opts.step_per_update * opts.n_envs,
-        deterministic=False,
         n_eval_episodes=10,
         best_model_save_path=os.path.join(log_path, "weights"),
         log_path=os.path.join(log_path, "eval"),

@@ -16,14 +16,10 @@ def parse_args() -> Namespace:
     )
 
     # Environment configuration
-    parser.add_argument(
-        "--env-id", type=str, choices=["TankManShooter-v0", "TankManResupply-v0"]
-    )
-    parser.add_argument("--green-team-num", type=int, default=3, choices=[1, 2, 3])
-    parser.add_argument("--blue-team-num", type=int, default=3, choices=[1, 2, 3])
-    parser.add_argument("--stack-num", type=int, default=4)
-    parser.add_argument("--frame-limit", type=int, default=2000)
-    parser.add_argument("--determinstic", action="store_true")
+    parser.add_argument("--stack-num", type=int, default=2)
+    parser.add_argument("--frame-limit", type=int, default=1000)
+    parser.add_argument("--deterministic", action="store_true")
+    parser.add_argument("--npc-random-movement", action="store_true")
 
     return parser.parse_args()
 
@@ -36,23 +32,27 @@ if __name__ == "__main__":
 
     # Create environment
     env = get_env(
-        env_id=opts.env_id,
+        env_id="TankManShooter-v0",
         stack_num=opts.stack_num,
         env_kwargs={
-            "green_team_num": opts.green_team_num,
-            "blue_team_num": opts.blue_team_num,
             "frame_limit": opts.frame_limit,
-            "randomize": True,
+            "shuffle": True,
+            "npc_random_movement": opts.npc_random_movement,
             "render_mode": "human",
         },
     )
 
     # Play!
+    total_reward = 0
     obs, _ = env.reset()
     while True:
-        action, _ = model.predict(obs, deterministic=opts.determinstic)
+        action, _ = model.predict(obs, deterministic=opts.deterministic)
         obs, reward, terminate, truncated, _ = env.step(action)
+
+        total_reward += reward  # type: ignore
 
         env.render()
         if terminate or truncated:
             break
+
+    print(total_reward)

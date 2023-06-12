@@ -2,7 +2,6 @@ import gymnasium as gym
 import supersuit as ss
 from gymnasium.wrappers.flatten_observation import FlattenObservation
 from gymnasium.wrappers.frame_stack import FrameStack
-from sb3_contrib.common.wrappers import ActionMasker
 
 
 def get_env(

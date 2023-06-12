@@ -17,13 +17,13 @@ def parser_arg() -> Namespace:
     parser = ArgumentParser()
 
     # Environment configuration
-    parser.add_argument("--green-team-num", type=int, default=3, choices=[1, 2, 3])
-    parser.add_argument("--blue-team-num", type=int, default=3, choices=[1, 2, 3])
     parser.add_argument("--stack-num", type=int, default=2)
     parser.add_argument("--frame-limit", type=int, default=1000)
 
     # Training Hyperparameters
-    parser.add_argument("--total-time-steps", type=int, default=30000000)
+    parser.add_argument("--pretrained", type=str, default=None)
+    parser.add_argument("--npc-random-movement", action="store_true")
+    parser.add_argument("--total-time-steps", type=int, default=50000000)
     parser.add_argument("--n-envs", type=int, default=4)
 
     # PPO Hyperparameters
@@ -53,10 +53,9 @@ def train(opts: Namespace) -> None:
             "stack_num": opts.stack_num,
             "action_mask": False,
             "env_kwargs": {  # This one is for the actually env
-                "green_team_num": opts.green_team_num,
-                "blue_team_num": opts.blue_team_num,
                 "frame_limit": opts.frame_limit,
-                "randomize": True,
+                "shuffle": True,
+                "npc_random_movement": opts.npc_random_movement,
                 "render_mode": None,
             },
         },
@@ -64,33 +63,36 @@ def train(opts: Namespace) -> None:
     )
 
     # Policy
-    model = PPO(
-        policy="MlpPolicy",
-        env=vec_env,
-        policy_kwargs={
-            "net_arch": {
-                "pi": opts.hidden_sizes,
-                "vf": opts.hidden_sizes,
+    if opts.pretrained is not None:
+        model = PPO.load(opts.pretrained, env=vec_env)
+    else:
+        model = PPO(
+            policy="MlpPolicy",
+            env=vec_env,
+            policy_kwargs={
+                "net_arch": {
+                    "pi": opts.hidden_sizes,
+                    "vf": opts.hidden_sizes,
+                },
             },
-        },
-        learning_rate=opts.lr,
-        n_steps=opts.step_per_update * opts.n_envs,
-        batch_size=opts.batch_size,
-        n_epochs=opts.repeat_per_update,
-        gamma=opts.gamma,
-        gae_lambda=opts.gae_lambda,
-        clip_range=opts.clip_range,
-        clip_range_vf=opts.clip_range_vf,
-        normalize_advantage=True,
-        ent_coef=opts.ent_coef,
-        vf_coef=opts.vf_coef,
-        max_grad_norm=opts.max_grad_norm,
-        verbose=1,
-    )
+            learning_rate=opts.lr,
+            n_steps=opts.step_per_update * opts.n_envs,
+            batch_size=opts.batch_size,
+            n_epochs=opts.repeat_per_update,
+            gamma=opts.gamma,
+            gae_lambda=opts.gae_lambda,
+            clip_range=opts.clip_range,
+            clip_range_vf=opts.clip_range_vf,
+            normalize_advantage=True,
+            ent_coef=opts.ent_coef,
+            vf_coef=opts.vf_coef,
+            max_grad_norm=opts.max_grad_norm,
+            verbose=1,
+        )
     print(model.policy)
 
     # Logger
-    log_path = f"log/sb3/train_shooter_{time.strftime('%b%d_%Y_%H-%M-%S')}"
+    log_path = f"log/sb3/train_shooter{'_pretrained' if opts.pretrained is not None else ''}_{time.strftime('%b%d_%Y_%H-%M-%S')}"
     logger = configure(log_path, ["stdout", "tensorboard"])
     model.set_logger(logger)
 
@@ -104,17 +106,15 @@ def train(opts: Namespace) -> None:
         stack_num=opts.stack_num,
         action_mask=False,
         env_kwargs={
-            "green_team_num": opts.green_team_num,
-            "blue_team_num": opts.blue_team_num,
             "frame_limit": opts.frame_limit,
-            "randomize": True,
+            "shuffle": True,
+            "npc_random_movement": opts.npc_random_movement,
         },
     )
     eval_env = Monitor(eval_env)
     eval_callback = EvalCallback(
         eval_env=eval_env,
         eval_freq=opts.step_per_update * opts.n_envs,
-        deterministic=False,
         n_eval_episodes=10,
         best_model_save_path=os.path.join(log_path, "weights"),
         log_path=os.path.join(log_path, "eval"),
